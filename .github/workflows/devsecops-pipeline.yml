@@ -9,7 +9,8 @@ on:
 jobs:
   sast:
     name: SAST - SonarQube
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, sonar]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,22 +19,14 @@ jobs:
 
       - name: Debug konektivitas SonarQube
         run: |
-          echo "=== Cek SONAR_HOST_URL ada atau tidak ==="
+          echo "=== Cek SONAR_HOST_URL ==="
           if [ -z "${{ secrets.SONAR_HOST_URL }}" ]; then
             echo "ERROR: SONAR_HOST_URL secret kosong"
             exit 1
           fi
-          echo "Host URL ter-set"
 
-          echo "=== Test TCP ke server ==="
-          timeout 10 bash -c 'cat < /dev/tcp/172.237.74.42/9000' \
-            && echo "✓ Port reachable" \
-            || (echo "✗ Port BLOCKED — gunakan self-hosted runner" && exit 1)
-
-          echo "=== Test HTTP API ==="
-          curl -sf --max-time 10 "${{ secrets.SONAR_HOST_URL }}/api/system/status" \
-            && echo "✓ SonarQube responsif" \
-            || (echo "✗ SonarQube tidak respon" && exit 1)
+          echo "=== Test HTTP API SonarQube ==="
+          curl -v --max-time 15 "${{ secrets.SONAR_HOST_URL }}/api/system/status"
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
