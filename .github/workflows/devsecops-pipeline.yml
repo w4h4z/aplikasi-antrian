@@ -147,20 +147,19 @@ jobs:
 
           chmod 666 zap-output/rules.tsv
 
-      - name: OWASP ZAP Baseline Scan
+      - name: OWASP ZAP Full Scan
         run: |
-          echo "=== Run OWASP ZAP Baseline Scan ==="
+          echo "=== Run OWASP ZAP Full Scan ==="
 
           docker run --rm \
             --network host \
             -v "${{ github.workspace }}/zap-output:/zap/wrk/:rw" \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py \
+            zap-full-scan.py \
             -t "http://127.0.0.1:8080/?id=1" \
             -r zap_report.html \
             -J zap_report.json \
             -w zap_report.md \
-            -c rules.tsv \
             -a || true
 
       - name: Stop PHP Built-in Server
