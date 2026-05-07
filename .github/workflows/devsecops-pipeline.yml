@@ -29,14 +29,18 @@ jobs:
           curl -sf --max-time 15 "${{ secrets.SONAR_HOST_URL }}/api/system/status"
           echo ""
 
-      - name: SonarQube Scan
+      - name: SonarQube Scan with Quality Gate
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
 
   dast:
-    name: DAST - OWASP ZAP
+    name: DAST - OWASP ZAP Baseline
     runs-on: [self-hosted, linux, x64, sonar]
     needs: sast
 
@@ -120,7 +124,7 @@ jobs:
             exit 1
           }
 
-          echo "=== Test vulnerable page ==="
+          echo "=== Test app with parameter ==="
           curl -v --max-time 15 "http://127.0.0.1:8080/?id=1" || {
             echo "=== PHP server log ==="
             cat php_server.log
@@ -172,7 +176,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
+          name: zap-baseline-report
           path: |
             zap-output/zap_report.html
             zap-output/zap_report.json
