@@ -1,8 +1,8 @@
 <?php
 // VULNERABLE INTENTIONALLY — jangan dipakai di production
-$db_password = "admin123";   // hardcoded secret
+$db_password = "XecuraPass123!";   // hardcoded secret
 
-$conn = new mysqli("127.0.0.1", "root", "", "antrian");
+$conn = mysqli_connect("127.0.0.1", "xecura", $db_password, "antrian");
 if ($conn->connect_error) {
     die("DB error: " . $conn->connect_error);
 }

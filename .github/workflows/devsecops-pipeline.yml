@@ -17,19 +17,118 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug konektivitas SonarQube
+      - name: Debug SonarQube connection
         run: |
-          echo "=== Cek SONAR_HOST_URL ==="
+          echo "=== Check SONAR_HOST_URL ==="
           if [ -z "${{ secrets.SONAR_HOST_URL }}" ]; then
-            echo "ERROR: SONAR_HOST_URL secret kosong"
+            echo "ERROR: SONAR_HOST_URL secret is empty"
             exit 1
           fi
 
-          echo "=== Test HTTP API SonarQube ==="
-          curl -v --max-time 15 "${{ secrets.SONAR_HOST_URL }}/api/system/status"
+          echo "=== Test SonarQube API ==="
+          curl -sf --max-time 15 "${{ secrets.SONAR_HOST_URL }}/api/system/status"
+          echo ""
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  dast:
+    name: DAST - OWASP ZAP
+    runs-on: [self-hosted, linux, x64, sonar]
+    needs: sast
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check runtime
+        run: |
+          echo "=== PHP ==="
+          php -v
+
+          echo "=== MySQL ==="
+          mysql --version
+
+          echo "=== Docker ==="
+          docker --version
+
+      - name: Check database connection
+        run: |
+          echo "=== Test DB connection as xecura ==="
+          MYSQL_PWD='XecuraPass123!' mysql \
+            -h 127.0.0.1 \
+            -u xecura \
+            antrian \
+            -e "SELECT * FROM tickets;"
+
+      - name: Start PHP built-in server
+        run: |
+          echo "=== Start PHP server ==="
+
+          nohup php -S 0.0.0.0:8080 -t . > php_server.log 2>&1 &
+          echo $! > php_server.pid
+
+          sleep 5
+
+          echo "=== Test root page ==="
+          curl -v --max-time 15 http://127.0.0.1:8080/ || {
+            echo "=== PHP server log ==="
+            cat php_server.log
+            exit 1
+          }
+
+          echo "=== Test vulnerable page ==="
+          curl -v --max-time 15 "http://127.0.0.1:8080/?id=1" || {
+            echo "=== PHP server log ==="
+            cat php_server.log
+            exit 1
+          }
+
+      - name: Prepare ZAP rules
+        run: |
+          mkdir -p .zap
+
+          if [ ! -f .zap/rules.tsv ]; then
+            echo "No .zap/rules.tsv found. Creating empty rules file."
+            touch .zap/rules.tsv
+          fi
+
+      - name: OWASP ZAP Baseline Scan
+        run: |
+          echo "=== Run OWASP ZAP Baseline Scan ==="
+
+          docker run --rm \
+            --network host \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t "http://127.0.0.1:8080/?id=1" \
+            -r zap_report.html \
+            -J zap_report.json \
+            -w zap_report.md \
+            -c .zap/rules.tsv \
+            -a || true
+
+      - name: Stop PHP built-in server
+        if: always()
+        run: |
+          echo "=== Stop PHP server ==="
+
+          if [ -f php_server.pid ]; then
+            kill "$(cat php_server.pid)" || true
+          fi
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            zap_report.html
+            zap_report.json
+            zap_report.md
+            php_server.log
+          retention-days: 14
