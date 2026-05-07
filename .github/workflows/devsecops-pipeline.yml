@@ -29,11 +29,15 @@ jobs:
           curl -sf --max-time 15 "${{ secrets.SONAR_HOST_URL }}/api/system/status"
           echo ""
 
-      - name: SonarQube Scan
+      - name: SonarQube Scan with Quality Gate
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
 
   dast:
     name: DAST - OWASP ZAP
