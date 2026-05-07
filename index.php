@@ -2,15 +2,15 @@
 declare(strict_types=1);
 
 // Ambil konfigurasi database dari environment variable
-$db_host = getenv('DB_HOST') ?: '127.0.0.1';
-$db_user = getenv('DB_USER') ?: 'xecura';
-$db_pass = getenv('DB_PASS') ?: '';
-$db_name = getenv('DB_NAME') ?: 'antrian';
+$dbHost = getenv('DB_HOST') ?: '127.0.0.1';
+$dbUser = getenv('DB_USER') ?: 'xecura';
+$dbPass = getenv('DB_PASS') ?: '';
+$dbName = getenv('DB_NAME') ?: 'antrian';
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    $conn = new mysqli($dbHost, $dbUser, $dbPass, $dbName);
     $conn->set_charset('utf8mb4');
 } catch (mysqli_sql_exception $e) {
     error_log('Database connection error: ' . $e->getMessage());
@@ -18,13 +18,13 @@ try {
     exit('Internal server error');
 }
 
-function escape_html(string $value): string
+function escapeHtml(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-$ticket_name = null;
+$ticketName = null;
 $message = 'Masukkan parameter ?id=1';
 
 if ($id !== null && $id !== false) {
@@ -37,7 +37,7 @@ if ($id !== null && $id !== false) {
         $row = $result->fetch_assoc();
 
         if ($row) {
-            $ticket_name = $row['nama'];
+            $ticketName = $row['nama'];
             $message = 'Detail Tiket: ' . $id;
         } else {
             $message = 'Tiket tidak ditemukan.';
@@ -76,10 +76,10 @@ if ($id !== null && $id !== false) {
   </style>
 </head>
 <body>
-  <h1><?= escape_html($message) ?></h1>
+  <h1><?= escapeHtml($message) ?></h1>
 
-  <?php if ($ticket_name !== null): ?>
-    <p>Nama: <?= escape_html($ticket_name) ?></p>
+  <?php if ($ticketName !== null): ?>
+    <p>Nama: <?= escapeHtml($ticketName) ?></p>
   <?php endif; ?>
 
   <table>
