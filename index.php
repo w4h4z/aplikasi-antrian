@@ -1,98 +1,32 @@
 <?php
-declare(strict_types=1);
+// VULNERABLE INTENTIONALLY — jangan dipakai di production
+$db_password = "admin123";   // hardcoded secret
 
-// Ambil konfigurasi database dari environment variable
-$dbHost = getenv('DB_HOST') ?: '127.0.0.1';
-$dbUser = getenv('DB_USER') ?: 'xecura';
-$dbPass = getenv('DB_PASS') ?: '';
-$dbName = getenv('DB_NAME') ?: 'antrian';
-
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-
-try {
-    $conn = new mysqli($dbHost, $dbUser, $dbPass, $dbName);
-    $conn->set_charset('utf8mb4');
-} catch (mysqli_sql_exception $e) {
-    error_log('Database connection error: ' . $e->getMessage());
-    http_response_code(500);
-    exit('Internal server error');
+$conn = new mysqli("127.0.0.1", "root", "", "antrian");
+if ($conn->connect_error) {
+    die("DB error: " . $conn->connect_error);
 }
 
-function escapeHtml(string $value): string
-{
-    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-}
+$id = $_GET['id'] ?? '';
 
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-$ticketName = null;
-$message = 'Masukkan parameter ?id=1';
+if ($id !== '') {
+    // SQL Injection: input langsung di-concat ke query
+    $result = $conn->query("SELECT * FROM tickets WHERE id = $id");
 
-if ($id !== null && $id !== false) {
-    try {
-        $stmt = $conn->prepare('SELECT nama FROM tickets WHERE id = ?');
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
+    // Reflected XSS: input di-echo tanpa escape
+    echo "<h1>Detail Tiket: " . $_GET['id'] . "</h1>";
 
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-
-        if ($row) {
-            $ticketName = $row['nama'];
-            $message = 'Detail Tiket: ' . $id;
-        } else {
-            $message = 'Tiket tidak ditemukan.';
-        }
-
-        $stmt->close();
-    } catch (mysqli_sql_exception $e) {
-        error_log('Query error: ' . $e->getMessage());
-        http_response_code(500);
-        $message = 'Internal server error.';
+    if ($result && $row = $result->fetch_assoc()) {
+        echo "<p>Nama: " . $row['nama'] . "</p>";
     }
+} else {
+    echo "<h1>Masukkan parameter ?id=1</h1>";
 }
 ?>
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <title>Form Tikett</title>
-  <style>
-    body {
-      background-color: white;
-      font-family: Arial, sans-serif;
-    }
-
-    table {
-      width: 500px;
-      border-collapse: collapse;
-    }
-
-    th,
-    td {
-      border: 1px solid #cccccc;
-      padding: 8px;
-      text-align: left;
-    }
-  </style>
-</head>
-<body>
-  <h1><?= escapeHtml($message) ?></h1>
-
-  <?php if ($ticketName !== null): ?>
-    <p>Nama: <?= escapeHtml($ticketName) ?></p>
-  <?php endif; ?>
-
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Judul Form</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Form Tiket</td>
-      </tr>
-    </tbody>
-  </table>
-</body>
+<html>
+  <body bgcolor="white">
+    <table width="500">
+      <tr><td>Form Tiket</td></tr>
+    </table>
+  </body>
 </html>
