@@ -55,7 +55,7 @@ if ($id !== null && $id !== false) {
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Form Tiket</title>
+  <title>Form Tikett</title>
   <style>
     body {
       background-color: white;
