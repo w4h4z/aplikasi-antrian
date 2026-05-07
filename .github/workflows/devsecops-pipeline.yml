@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug SonarQube connection
+      - name: Debug SonarQube Connection
         run: |
           echo "=== Check SONAR_HOST_URL ==="
           if [ -z "${{ secrets.SONAR_HOST_URL }}" ]; then
@@ -40,31 +40,71 @@ jobs:
     runs-on: [self-hosted, linux, x64, sonar]
     needs: sast
 
+    env:
+      DB_HOST: 127.0.0.1
+      DB_NAME: antrian
+      DB_USER: xecura
+      DB_PASS: ${{ secrets.DB_PASS }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check runtime
+      - name: Check Runtime
         run: |
-          echo "=== PHP ==="
+          echo "=== PHP Version ==="
           php -v
 
-          echo "=== MySQL ==="
+          echo "=== MySQL Version ==="
           mysql --version
 
-          echo "=== Docker ==="
+          echo "=== Docker Version ==="
           docker --version
 
-      - name: Check database connection
+      - name: Check Database Connection
         run: |
-          echo "=== Test DB connection as xecura ==="
-          MYSQL_PWD='XecuraPass123!' mysql \
-            -h 127.0.0.1 \
-            -u xecura \
-            antrian \
-            -e "SELECT * FROM tickets;"
+          echo "=== Test MariaDB connection ==="
 
-      - name: Start PHP built-in server
+          if [ -z "$DB_PASS" ]; then
+            echo "ERROR: DB_PASS secret is empty"
+            exit 1
+          fi
+
+          MYSQL_PWD="$DB_PASS" mysql \
+            -h "$DB_HOST" \
+            -u "$DB_USER" \
+            "$DB_NAME" \
+            -e "SELECT DATABASE();"
+
+      - name: Prepare Test Data
+        run: |
+          echo "=== Prepare tickets table ==="
+
+          MYSQL_PWD="$DB_PASS" mysql \
+            -h "$DB_HOST" \
+            -u "$DB_USER" \
+            "$DB_NAME" <<'SQL'
+          CREATE TABLE IF NOT EXISTS tickets (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            nama VARCHAR(100) NOT NULL
+          );
+
+          INSERT INTO tickets (nama)
+          SELECT 'Budi'
+          WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE nama = 'Budi');
+
+          INSERT INTO tickets (nama)
+          SELECT 'Siti'
+          WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE nama = 'Siti');
+
+          INSERT INTO tickets (nama)
+          SELECT 'Andi'
+          WHERE NOT EXISTS (SELECT 1 FROM tickets WHERE nama = 'Andi');
+
+          SELECT * FROM tickets;
+          SQL
+
+      - name: Start PHP Built-in Server
         run: |
           echo "=== Start PHP server ==="
 
@@ -87,14 +127,21 @@ jobs:
             exit 1
           }
 
-      - name: Prepare ZAP rules
+      - name: Prepare ZAP Output Directory
         run: |
-          mkdir -p .zap
+          echo "=== Prepare ZAP output directory ==="
 
-          if [ ! -f .zap/rules.tsv ]; then
-            echo "No .zap/rules.tsv found. Creating empty rules file."
-            touch .zap/rules.tsv
+          rm -rf zap-output
+          mkdir -p zap-output
+          chmod 777 zap-output
+
+          if [ -f .zap/rules.tsv ]; then
+            cp .zap/rules.tsv zap-output/rules.tsv
+          else
+            touch zap-output/rules.tsv
           fi
+
+          chmod 666 zap-output/rules.tsv
 
       - name: OWASP ZAP Baseline Scan
         run: |
@@ -102,17 +149,17 @@ jobs:
 
           docker run --rm \
             --network host \
-            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            -v "${{ github.workspace }}/zap-output:/zap/wrk/:rw" \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t "http://127.0.0.1:8080/?id=1" \
             -r zap_report.html \
             -J zap_report.json \
             -w zap_report.md \
-            -c .zap/rules.tsv \
+            -c rules.tsv \
             -a || true
 
-      - name: Stop PHP built-in server
+      - name: Stop PHP Built-in Server
         if: always()
         run: |
           echo "=== Stop PHP server ==="
@@ -127,8 +174,8 @@ jobs:
         with:
           name: zap-report
           path: |
-            zap_report.html
-            zap_report.json
-            zap_report.md
+            zap-output/zap_report.html
+            zap-output/zap_report.json
+            zap-output/zap_report.md
             php_server.log
           retention-days: 14
