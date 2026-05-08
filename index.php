@@ -26,7 +26,7 @@ if ($id !== '') {
 <html>
   <body bgcolor="white">
     <table width="500">
-      <tr><td>Form Tiket</td></tr>
+      <tr><td>Form Tikett</td></tr>
     </table>
   </body>
 </html>
